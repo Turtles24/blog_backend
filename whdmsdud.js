@@ -21,17 +21,7 @@ const upload = multer({
 }).array('files', 10);
 
 // 파일 업로드 API
-app.post('/articles/:articleId/files', (req, res) => {
-    const { articleId } = req.params;
-
-    if (!articleId) {
-        return res.status(400).json({
-            isSuccess: false,
-            code: '400',
-            message: '아티클 ID가 유효하지 않습니다.',
-        });
-    }
-
+app.post('/files', (req, res) => {
     upload(req, res, (err) => {
         if (err instanceof multer.MulterError) {
             if (err.code === "LIMIT_FILE_SIZE") {
@@ -65,45 +55,54 @@ app.post('/articles/:articleId/files', (req, res) => {
             isSuccess: true,
             code: '201',
             timestamp: new Date().toISOString(),
-            result: {
-                articleId: parseInt(articleId, 10),
-                uploadedFiles,
-            },
+            result: uploadedFiles,
         });
     });
 });
 
-// 파일 삭제 API
-app.delete('/articles/:articleId/files/:fileId', (req, res) => {
-    const { articleId, fileId } = req.params;
+// 아티클에 파일 연결 API
+app.post('/articles/:articleId/files', (req, res) => {
+    const { articleId } = req.params;
+    const { fileIds } = req.body; // 클라이언트에서 파일 ID 리스트를 전달
 
-    // 권한 확인
-    const authorization = req.headers['authorization'];
-    if (!authorization || !authorization.startsWith('Bearer ')) {
-        return res.status(403).json({
-            isSuccess: false,
-            code: '403',
-            message: '파일 삭제 권한이 없습니다.',
-        });
-    }
-
-    // 유효성 검사
-    if (!articleId || !fileId) {
+    if (!articleId || !Array.isArray(fileIds) || fileIds.length === 0) {
         return res.status(400).json({
             isSuccess: false,
             code: '400',
-            message: '유효하지 않은 요청입니다.',
+            message: '유효하지 않은 요청입니다. 아티클 ID와 파일 ID 목록이 필요합니다.',
+        });
+    }
+
+    // 현재는 성공 메시지만 반환
+    res.status(201).json({
+        isSuccess: true,
+        code: '201',
+        timestamp: new Date().toISOString(),
+        message: `아티클 ${articleId}에 파일들이 성공적으로 연결되었습니다.`,
+        fileIds,
+    });
+});
+
+// 파일 삭제 API
+app.delete('/files/:fileId', (req, res) => {
+    const { fileId } = req.params;
+
+    if (!fileId) {
+        return res.status(400).json({
+            isSuccess: false,
+            code: '400',
+            message: '유효하지 않은 요청입니다. 파일 ID가 필요합니다.',
         });
     }
 
     // 파일 존재 여부 확인
-    const filePath = path.join(__dirname, 'uploads', `example-file-${fileId}.png`);
+    const filePath = path.join(__dirname, 'uploads', fileId);
 
     if (!fs.existsSync(filePath)) {
         return res.status(404).json({
             isSuccess: false,
             code: '404',
-            message: '파일 또는 아티클을 찾을 수 없습니다.',
+            message: '파일을 찾을 수 없습니다.',
         });
     }
 
