@@ -50,9 +50,9 @@ app.get("/articles/theme/:theme", (req, res) => {
 
 //아티클 삭제하기, ID 11, 테스트 완료
 app.delete("/articles/:articleId", (req, res) => {
-  const articleId = req.params.articleId;
+    const { articleId } = req.params;
 
-  if (!articleId) {
+  if (!articleId || articleId < 1 || articles.length < articleId) {
     return res.status(400).json({
       isSuccess: false,
       code: "400",
@@ -60,19 +60,15 @@ app.delete("/articles/:articleId", (req, res) => {
     });
   }
 
-  const articleExists = articles; //실제론 DB에서 가져올 값
+  articles.splice(articleId - 1, 1);
 
-  if (!articleExists) {
-    return res.status(404).json({
-      isSuccess: false,
-      code: "404",
-      message: "아티클을 찾을 수 없습니다.(오류코드: 404)",
-    });
-  }
+  return res.status(200).json({
+    isSuccess: true,
+    code: "200",
+    timestamp: new Date().toISOString(),
+    message: `아티클이 삭제됐습니다. 아티클 아이디: (${parseInt(articleId, 10)})`,
+  });
 
-  //DB에서 아티클을 삭제한 후
-
-  res.send({ message: "Article with ID 1 deleted." });
 }); //주소창 예시: http://localhost:3000/articles/30
 
 //아티클 등록, ID 4, 테스트 완료
