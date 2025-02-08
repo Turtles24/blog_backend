@@ -105,6 +105,44 @@ app.post("/articles", (req, res) => {
 });
 //주소창 예시: http://localhost:3000/articles
 
+// PATCH /articles/:articleId
+app.patch("/articles/:articleId", (req, res) => {
+  const { articleId } = req.params;
+  const { theme, title, content, subTitle } = req.body;
+
+  const article = articles.find(
+    (item) => item.articleId === parseInt(articleId)
+  );
+
+  if (!article) {
+    return res.status(404).json({
+      isSuccess: false,
+      code: "404",
+      message: "해당 게시글을 찾을 수 없습니다.",
+    });
+  }
+
+  if (theme !== undefined) article.theme = theme;
+  if (title !== undefined) article.title = title;
+  if (content !== undefined) article.content = content;
+  if (subTitle !== undefined) article.subTitle = subTitle;
+
+  res.status(200).json({
+    isSuccess: true,
+    code: "200",
+    timestamp: new Date().toISOString(),
+    result: {
+      articleId: article.articleId,
+      userName: article.userName,
+      theme: article.theme,
+      title: article.title,
+      content: article.content,
+      subTitle: article.subTitle,
+      uploadDate: article.uploadDate,
+    },
+  });
+});
+
 // Get /articles/search
 app.get("/articles/search/:keyword", (req, res) => {
   const { keyword } = req.params;
