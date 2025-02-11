@@ -5,6 +5,36 @@ const multer = require("multer");
 
 app.use(cors());
 
+const fs = require("fs");
+const path = require("path");
+
+const uploadDir = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("'uploads/' 디렉토리가 생성되었습니다.");
+}
+
+const sanitizeFilename = (filename) => {
+  return filename.replace(/[<>:"/\\|?*]+/g, "");
+};
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, "uploads");
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const sanitizedFilename = sanitizeFilename(file.originalname);
+    cb(null, `${Date.now()}-${sanitizedFilename}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).array("files", 10);
+
 app.use(express.json());
 
 let articles = [];
@@ -28,9 +58,10 @@ app.get("/articles/theme/:theme", (req, res) => {
 
   const articleList = articles.map((article, index) => ({
     articleId: index + 1,
-    data: { userName: article.data.userName || "string" },
-    title: article.title || "string",
-    subTitle: article.subTitle || "string",
+    data: { userName: article.data.userName },
+    title: article.title,
+    subTitle: article.subTitle,
+    postFileList: article.postFileList,
   }));
 
   const response = {
@@ -50,7 +81,7 @@ app.get("/articles/theme/:theme", (req, res) => {
 
 //아티클 삭제하기, ID 11, 테스트 완료
 app.delete("/articles/:articleId", (req, res) => {
-    const { articleId } = req.params;
+  const { articleId } = req.params;
 
   if (!articleId || articleId < 1 || articles.length < articleId) {
     return res.status(400).json({
@@ -66,16 +97,18 @@ app.delete("/articles/:articleId", (req, res) => {
     isSuccess: true,
     code: "200",
     timestamp: new Date().toISOString(),
-    message: `아티클이 삭제됐습니다. 아티클 아이디: (${parseInt(articleId, 10)})`,
+    message: `아티클이 삭제됐습니다. 아티클 아이디: (${parseInt(
+      articleId,
+      10
+    )})`,
   });
-
 }); //주소창 예시: http://localhost:3000/articles/30
 
 //아티클 등록, ID 4, 테스트 완료
 app.post("/articles", (req, res) => {
-  const { theme, title, content, userName, subTitle } = req.body;
+  const { theme, title, content, userName, subTitle, postFileList } = req.body;
 
-  if (!theme || !title || !content || !userName || !subTitle) {
+  if (!theme || !title || !content || !userName || !subTitle || !postFileList) {
     return res.status(400).json({
       isSuccess: false,
       code: "400",
@@ -92,6 +125,7 @@ app.post("/articles", (req, res) => {
     subTitle,
     content,
     uploadDate: timestamp,
+    postFileList,
   };
 
   articles.push(newArticle);
@@ -104,6 +138,31 @@ app.post("/articles", (req, res) => {
   });
 });
 //주소창 예시: http://localhost:3000/articles
+
+// 아티클 상세 조회 API (POST 방식)
+app.get("/articles/:articleId", (req, res) => {
+  const { articleId } = req.params;
+
+  const article = articles.find(
+    (item) => item.articleId === parseInt(articleId)
+  );
+
+  // 아티클이 존재하는 경우
+  if (article) {
+    return res.status(200).json({
+      isSuccess: true,
+      code: "200",
+      timestamp: new Date().toISOString().split("T")[0],
+      result: article,
+    });
+  }
+
+  return res.status(404).json({
+    isSuccess: false,
+    code: "404",
+    message: "아티클 상세 조회에 실패했습니다.",
+  });
+});
 
 // PATCH /articles/:articleId
 app.patch("/articles/:articleId", (req, res) => {
@@ -157,17 +216,16 @@ app.get("/articles/search/:keyword", (req, res) => {
     });
   }
 
-  // title과 content에서만 필터링
   const results = articles.filter((article) => {
-    console.log("현재 비교 중인 글:", article); // 각 글 로그
+    console.log("현재 비교 중인 글:", article);
     const isMatch =
       article.title.toLowerCase().includes(keyword.toLowerCase()) ||
       article.content.toLowerCase().includes(keyword.toLowerCase());
-    console.log("매칭 여부:", isMatch); // 매칭 여부 로그
+    console.log("매칭 여부:", isMatch);
     return isMatch;
   });
 
-  console.log("최종 필터링 결과:", results); // 최종 결과 로그
+  console.log("최종 필터링 결과:", results);
 
   return res.status(200).json({
     isSuccess: true,
@@ -177,33 +235,11 @@ app.get("/articles/search/:keyword", (req, res) => {
   });
 });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // 저장 디렉토리
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 최대 파일 크기: 5MB
-}).array("files", 10);
-
 // 파일 업로드 API
-app.post("/articles/:articleId/files", (req, res) => {
-  const { articleId } = req.params;
-
-  if (!articleId) {
-    return res.status(400).json({
-      isSuccess: false,
-      code: "400",
-      message: "아티클 ID가 유효하지 않습니다.",
-    });
-  }
-
+app.post("/files", (req, res) => {
   upload(req, res, (err) => {
+    console.log("업로드된 파일:", req.files);
+
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({
@@ -225,9 +261,8 @@ app.post("/articles/:articleId/files", (req, res) => {
       });
     }
 
-    // 파일 업로드 성공
     const uploadedFiles = req.files.map((file) => ({
-      fileId: `${Date.now()}-${Math.floor(Math.random() * 10000)}`, // 고유 ID 생성
+      fileId: `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
       fileName: file.originalname,
       fileUrl: `https://example.com/uploads/${file.filename}`,
     }));
@@ -236,49 +271,55 @@ app.post("/articles/:articleId/files", (req, res) => {
       isSuccess: true,
       code: "201",
       timestamp: new Date().toISOString(),
-      result: {
-        articleId: parseInt(articleId, 10),
-        uploadedFiles,
-      },
+      result: uploadedFiles,
     });
   });
 });
 
-// 파일 삭제 API
-app.delete("/articles/:articleId/files/:fileId", (req, res) => {
-  const { articleId, fileId } = req.params;
+/* 사용하지 않음
+app.post("/articles/:articleId/files", (req, res) => {
+  const { articleId } = req.params;
+  const { fileIds } = req.body; 
 
-  // 권한 확인
-  const authorization = req.headers["authorization"];
-  if (!authorization || !authorization.startsWith("Bearer ")) {
-    return res.status(403).json({
-      isSuccess: false,
-      code: "403",
-      message: "파일 삭제 권한이 없습니다.",
-    });
-  }
-
-  // 유효성 검사
-  if (!articleId || !fileId) {
+  if (!articleId || !Array.isArray(fileIds) || fileIds.length === 0) {
     return res.status(400).json({
       isSuccess: false,
       code: "400",
-      message: "유효하지 않은 요청입니다.",
+      message:
+        "유효하지 않은 요청입니다. 아티클 ID와 파일 ID 목록이 필요합니다.",
+    });
+  }
+
+  // 현재는 성공 메시지만 반환
+  res.status(201).json({
+    isSuccess: true,
+    code: "201",
+    timestamp: new Date().toISOString(),
+    message: `아티클 ${articleId}에 파일들이 성공적으로 연결되었습니다.`,
+    fileIds,
+  });
+});
+
+// 파일 삭제 API
+app.delete("/files/:fileId", (req, res) => {
+  const { fileId } = req.params;
+
+  if (!fileId) {
+    return res.status(400).json({
+      isSuccess: false,
+      code: "400",
+      message: "유효하지 않은 요청입니다. 파일 ID가 필요합니다.",
     });
   }
 
   // 파일 존재 여부 확인
-  const filePath = path.join(
-    __dirname,
-    "uploads",
-    `example-file-${fileId}.png`
-  );
+  const filePath = path.join(__dirname, "uploads", fileId);
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({
       isSuccess: false,
       code: "404",
-      message: "파일 또는 아티클을 찾을 수 없습니다.",
+      message: "파일을 찾을 수 없습니다.",
     });
   }
 
@@ -300,8 +341,14 @@ app.delete("/articles/:articleId/files/:fileId", (req, res) => {
     });
   });
 });
+*/
 
-//예외처리, 테스트 완료
+// 서버 실행
+const port = 3000;
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
+
 app.use((req, res) => {
   res.status(404).json({
     isSuccess: false,
@@ -309,5 +356,3 @@ app.use((req, res) => {
     message: "요청하신 경로를 찾을 수 없습니다.(오류코드: 404)",
   });
 });
-
-app.listen(3000);
