@@ -1,0 +1,14 @@
+pipeline {
+    agent any
+    
+    stages {
+        
+        stage('github-clone') {
+            steps {
+                git branch: 'main', credentialsId: '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', url: 'https://github.com/Turtles24/blog_backend.git'
+            }
+        }
+        
+   		// stage...
+   	}
+}
