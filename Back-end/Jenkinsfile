@@ -9,6 +9,16 @@ pipeline {
             }
         }
         
-   		// stage...
+   		stage('Deploy') {
+	        steps {
+    	        sshagent(credentials: ['aws_key']) {
+			        sh '''
+            				ssh -o StrictHostKeyChecking=no ubuntu@13.124.106.142
+                            scp /var/jenkins_home/workspace/DaonBlog-0.0.1-SNAPSHOT.jar ubuntu@13.124.106.142:/home/ubuntu/blog_backend
+                            ssh -tt ubuntu@13.124.106.142 sh ./deploy.sh
+                        '''
+		            }
+	            }
+        }
    	}
 }
