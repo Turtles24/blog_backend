@@ -44,7 +44,7 @@ pipeline {
                     // "${SSH_CREDENTIALS_ID}"는 Jenkins에 설정된 SSH 접속 정보의 credentials ID입니다.
                     // "${EC2_IP}"는 대상 EC2 인스턴스의 IP 주소입니다.
                     sshagent(["${aws_key}"]) {
-                        sh "ssh -o StrictHostKeyChecking=no ec2-user@${13.124.106.142} 'docker run -d -p 80:8080 DatidaJenkinsDockerapp:${abc}'"
+                        sh "ssh -o StrictHostKeyChecking=no ec2-user@'13.124.106.142' 'docker run -d -p 80:8080 DatidaJenkinsDockerapp:${abc}'"
                     }
                 }
             }
